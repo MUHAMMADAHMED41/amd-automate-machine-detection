@@ -1,0 +1,208 @@
+AMD2 Installation Guide for Asterisk/VICIdial Server
+
+This guide explains how to install and configure the amd2.py script on an Asterisk server with VICIdial for Answering Machine Detection (AMD) and honeypot detection.
+
+Prerequisites
+
+
+Asterisk server with VICIdial installed.
+Python installed (check with python --version).
+MySQL server with VICIdial database (vicidial_log, vicidial_list tables).
+Root or sudo access to the server.
+Internet access to ws://api.amdy.io:2700.
+Git installed (optional, for cloning the repository).
+Step-by-Step Installation
+Install Required Python Libraries
+
+Install pip for Python 3.4 if not present:
+sudo apt update
+sudo apt install python3.4 python3-pip
+Install dependencies:
+sudo pip3.4 install pyst2 pymysql websocket-client
+verify:
+python3.4 -c "import pyst2, pymysql, websocket"
+
+
+
+Clone or Download the Repository
+
+
+
+
+
+Option 1: Clone using Git:
+
+git clone https://github.com/<your-username>/<your-repo>.git /tmp/amd2
+cd /tmp/amd2
+
+
+
+Option 2: Download files manually and transfer to the server (e.g., via SFTP).
+
+
+
+Copy the Script to Asterisk AGI Directory
+
+
+
+
+
+Move amd2.py to the correct location:
+
+sudo cp amd2.py /var/lib/asterisk/agi-bin/
+
+
+
+Set permissions:
+
+sudo chown asterisk:asterisk /var/lib/asterisk/agi-bin/amd2.py
+sudo chmod 755 /var/lib/asterisk/agi-bin/amd2.py
+
+
+
+Configure MySQL Credentials
+
+
+
+
+
+Ensure /etc/astguiclient.conf contains valid MySQL settings:
+
+sudo nano /etc/astguiclient.conf
+
+Example:
+
+VARDB_server => localhost
+VARDB_database => asterisk
+VARDB_user => root
+VARDB_pass => your_password
+VARDB_port => 3306
+
+
+
+Save and exit.
+
+
+
+Update Asterisk Dialplan
+
+
+
+
+
+Edit /etc/asterisk/extensions.conf:
+
+sudo nano /etc/asterisk/extensions.conf
+
+
+
+Add or modify a context to call amd2.py:
+
+[your-context]
+exten => s,1,Answer()
+exten => s,n,AGI(amd2.py)
+exten => s,n,Hangup()
+
+
+
+Save and reload dialplan:
+
+asterisk -rx "dialplan reload"
+
+
+
+Verify MySQL Database
+
+
+
+
+
+Log in to MySQL:
+
+mysql -u root -p
+
+
+
+Check VICIdial tables:
+
+USE asterisk;
+SHOW TABLES LIKE 'vicidial_log';
+SHOW TABLES LIKE 'vicidial_list';
+
+
+
+Ensure tables exist and have data. Fix any empty start_epoch values:
+
+SELECT uniqueid, start_epoch FROM vicidial_log WHERE start_epoch IS NULL OR start_epoch = '';
+
+
+
+Test the Script
+
+
+
+
+
+Restart Asterisk (optional):
+
+sudo systemctl restart asterisk
+
+
+
+Place a test call to the extension configured in the dialplan.
+
+
+
+Monitor logs:
+
+tail -f /var/log/amd/amd_$(date +%Y%m%d).log
+
+
+
+Expected output:
+
+2025-05-11 10:00:00,123 [INFO] Starting AGI - ANI: 1234567890, VID: Test, DID: s, Channel: SIP/100-00000001
+2025-05-11 10:00:00,124 [INFO] Websocket connected and configured.
+2025-05-11 10:00:00,125 [INFO] Machine detected
+
+Troubleshooting
+
+
+
+
+
+Log Errors: Check /var/log/amd/amd_YYYYMMDD.log for issues like missing AGI variables or database errors.
+
+
+
+AGI Environment: If agi_calleridname is empty, verify Asterisk dialplan and channel configuration.
+
+
+
+MySQL Issues: Ensure credentials in /etc/astguiclient.conf are correct and MySQL is running:
+
+sudo systemctl status mysql
+
+
+WebSocket Failures: Test connectivity:
+ping api.amdy.io
+
+Dependency Errors: Reinstall libraries if import errors occur.
+
+Maintenance
+
+Update the script by pulling from GitHub:
+
+cd /tmp/amd2
+git pull
+sudo cp amd2.py /var/lib/asterisk/agi-bin/
+sudo chown asterisk:asterisk /var/lib/asterisk/agi-bin/amd2.py
+sudo chmod 755 /var/lib/asterisk/agi-bin/amd2.py
+
+
+
+Monitor logs regularly for performance issues.
+
+Support
+
+For issues, open a ticket on the GitHub repositor
